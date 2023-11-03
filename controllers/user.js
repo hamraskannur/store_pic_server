@@ -3,21 +3,28 @@ import bcrypt from "bcrypt";
 import sharp from "sharp";
 import fetch from "node-fetch";
 import { promises as fsPromises } from "fs";
-import { v4 as uuidv4 } from 'uuid'; 
+import { v4 as uuidv4 } from "uuid";
 
 import { generateToken } from "../utils/jws.js";
 import UserCollection from "../models/user.js";
 import imageSchema from "../models/image.js";
 
 const saltRounds = 10;
-const passwordPattern = /^(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/;
+const passwordPattern =
+  /^(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/;
 
 export const login = async (req, res, next) => {
   const { email, password } = req.body;
   try {
-    if(!email || !password ) return res.send({ message: "Email or password wrong ", status: false });
-    if (!passwordPattern.test(password)) return res.send({ message: "Password contain minimum 6 letters and combination of Alphabets and numbers and a special character", status: false });
-    
+    if (!email || !password)
+      return res.send({ message: "Email or password wrong ", status: false });
+    if (!passwordPattern.test(password))
+      return res.send({
+        message:
+          "Password contain minimum 6 letters and combination of Alphabets and numbers and a special character",
+        status: false,
+      });
+
     const findUser = await UserCollection.findOne({ email });
     if (findUser) {
       const passwordVerify = await bcrypt.compare(password, findUser.password);
@@ -56,6 +63,7 @@ export const singup = async (req, res, next) => {
   try {
     const { email, password, userName } = req.body;
     const user = await UserCollection.findOne({ email });
+    const newKey = uuidv4();
 
     if (user) {
       message = "Email Exist";
@@ -71,6 +79,7 @@ export const singup = async (req, res, next) => {
         username: userName,
         email,
         password: await bcrypt.hash(password, saltRounds),
+        key:newKey
       }).save();
       const token = await generateToken({
         id: user._id.toString(),
@@ -86,17 +95,20 @@ export const singup = async (req, res, next) => {
 
 export const upload = async (req, res, next) => {
   try {
-    const { expirationTime ,userId} = req.body;
+    const { expirationTime, userId } = req.body;
     let expirationDate = new Date();
 
     if (req.fileValidationError) {
-      return res.json({ message: 'File size exceeds the limit (10MB)' ,success: false,});
+      return res.json({
+        message: "File size exceeds the limit (10MB)",
+        success: false,
+      });
     }
 
     if (expirationTime != 0) {
       expirationDate.setTime(
         expirationDate.getTime() + expirationTime * 24 * 60 * 60 * 1000
-      ); 
+      );
     } else {
       expirationDate = null;
     }
@@ -122,19 +134,19 @@ export const upload = async (req, res, next) => {
       userId: userId,
       Thumbnail: `data:image/jpeg;base64,${thumbnailBase64}`,
       expiration: expirationDate,
-      fullLink: '',
-      html: '',
-      thumbnailHtml: '',
+      fullLink: "",
+      html: "",
+      thumbnailHtml: "",
     });
-    
+
     image._id = image._id;
-    
-    image.fullLink =`${process.env.BASE_URL}/oneImage/${image._id}`;
-    image.html = `<a href="${process.env.BASE_URL}/oneImage/${image._id}"><img src="${image.image}" alt="pexels-efe-ersoy-17102321" border="0" /></a>`;
-    image.thumbnailHtml = `<a href="${process.env.BASE_URL}/oneImage/${image._id}"><img src="${image.Thumbnail}" border="0" /></a>`;
-    
+
+    image.fullLink = `${process.env.BASE_URL}/#/oneImage/${image._id}`;
+    image.html = `<a href="${process.env.BASE_URL}/#/oneImage/${image._id}"><img src="${image.image}" alt="pexels-efe-ersoy-17102321" border="0" /></a>`;
+    image.thumbnailHtml = `<a href="${process.env.BASE_URL}/#/oneImage/${image._id}"><img src="${image.Thumbnail}" border="0" /></a>`;
+
     await image.save();
-    
+
     res.status(200).json({
       message: "image fetched successfully",
       image,
@@ -198,14 +210,13 @@ export const getOneImages = async (req, res, next) => {
 
 export const deleteImage = async (req, res, next) => {
   try {
-
     const imageId = req.params.imageId;
     const image = await imageSchema.findById(imageId);
     if (!image) {
       return res.json({ success: false, message: "Image not found" });
     }
-    
-    if(image.userId != req.body.userId){
+
+    if (image.userId != req.body.userId) {
       return res.json({ success: false, message: "key not valid" });
     }
 
@@ -218,36 +229,124 @@ export const deleteImage = async (req, res, next) => {
     await imageSchema.findByIdAndDelete(imageId);
 
     res.json({ success: true, message: "Image deleted successfully" });
-
   } catch (error) {
     next(error);
   }
 };
 
+export const updateUserImage = async (req, res, next) => {
+  try {
+    const { userId, username } = req.body;
 
+
+    if (req.fileValidationError) {
+      return res.json({
+        message: "File size exceeds the limit (10MB)",
+        success: false,
+      });
+    }
+
+    // Find the user by ID
+    const user = await UserCollection.findById(userId);
+    const existUser = await UserCollection.findOne({ username: username });
+
+    if (existUser && userId != existUser._id) {
+      return res.json({ message: "exist User Name", success: false });
+    }
+
+    if (!user) {
+      return res.json({ message: "User not found", success: false });
+    }
+
+
+    if (req.file.filename) {
+      if(user.profileImage){
+        try {
+          await fsPromises.unlink(`public/${user.profileImage.split('/').pop()}`);
+        } catch (error) {
+          
+        }
+      }
+      const url = req.protocol + "://" + req.get("host");
+      const imageUrl = url + "/" + req.file.filename;
+      user.profileImage = imageUrl;
+      user.username = username;
+    }
+    // Save the updated user document
+    const updatedUser = await user.save();
+
+    // Respond with the updated user document
+    res.json({
+      message: "User status updated",
+      success: true,
+      user: updatedUser,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateUserName = async (req, res, next) => {
+  try {
+    const { userId, username } = req.body;
+    // Find the user by ID
+    const user = await UserCollection.findById(userId);
+    const existUser = await UserCollection.findOne({ username: username });
+    if (existUser && userId != existUser._id) {
+      return res.json({ message: "exist User Name", success: false });
+    }
+    if (!user) {
+      return res
+        .status(404)
+        .json({ message: "User not found", success: false });
+    }
+    console.log(username);
+    if (username != user.username) {
+      user.username = username;
+    } else {
+      return res.json({
+        message: "The user has already been updated",
+        status: true,
+      });
+    }
+    // Save the updated user document
+    const updatedUser = await user.save();
+
+    // Respond with the updated user document
+    res.json({
+      message: "User data updated",
+      success: true,
+      user: updatedUser,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const changeKey = async (req, res, next) => {
   try {
-    
     const { userId } = req.body;
-    
+
     // Generate a new unique key
-    const newKey = uuidv4(); 
+    const newKey = uuidv4();
 
     // Update the user's key in the database
     const updatedUser = await UserCollection.findOneAndUpdate(
       { _id: userId },
       { key: newKey },
-      { new: true, fields: { password: 0 }  } // Return the updated user
+      { new: true, fields: { password: 0 } } // Return the updated user
     );
 
     if (!updatedUser) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     // Send the updated user object as a response
-    res.json({ success: true,message: 'Key updated successfully', user: updatedUser });
-
+    res.json({
+      success: true,
+      message: "Key updated successfully",
+      user: updatedUser,
+    });
   } catch (error) {
     next(error);
   }
