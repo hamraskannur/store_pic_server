@@ -16,14 +16,7 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(
-    CORS({
-      origin: ["**"],
-      methods: ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"],
-      credentials: true,
-      exposedHeaders: ["Content-Length", "X-Foo", "X-Bar"],
-    })
-  );
+app.use(CORS());
 
 app.use("/" ,userRoutes)
 app.use("/admin" ,adminRoutes)
