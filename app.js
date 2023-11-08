@@ -18,7 +18,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(
     CORS({
-      origin: ["http://localhost:4200","https://hamraskannur.github.io/Store_Pic_Angular_Frontend","https://hamraskannur.github.io"],
+      origin: ["http://localhost:4200","https://hamraskannur.github.io/Store_Pic_Angular_Frontend/#","https://hamraskannur.github.io"],
       methods: ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"],
       credentials: true,
       exposedHeaders: ["Content-Length", "X-Foo", "X-Bar"],
