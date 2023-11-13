@@ -4,7 +4,6 @@ import CORS from "cors"
 import { fileURLToPath } from 'url';
 import path,{ dirname } from 'path';
 
-
 import { dbConnect } from "./config/connects.js"
 import {setupScheduledJob} from "./controllers/dayCheck.js"
 import userRoutes from "./routes/userRoutes.js"
@@ -21,9 +20,8 @@ app.use(CORS());
 app.use("/" ,userRoutes)
 app.use("/admin" ,adminRoutes)
 
-
-
 const port=3008
+
 app.listen(port,()=>{
     dbConnect()
     console.log(`server connection port : ${port}`);
